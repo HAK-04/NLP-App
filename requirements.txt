@@ -1,5 +1,6 @@
 streamlit
 pandas
+matplotlib
 nltk
 spacy
 scikit-learn
