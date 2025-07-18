@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
 import io
 
 from app import load_file, process_columns
@@ -95,7 +96,11 @@ if st.button("Run NLP Processing"):
 
                 st.markdown("**WordCloud:**")
                 if output[col]["wordcloud"]:
-                    st.pyplot(output[col]["wordcloud"].figure)
+                    fig, ax = plt.subplots(figsize=(10, 5))
+                    ax.imshow(output[col]["wordcloud"], interpolation='bilinear')
+                    ax.axis("off")
+                    st.pyplot(fig)
+
     else:
         # display limit
         st.info("More than 10 columns selected. Results are provided as a downloadable file.")
