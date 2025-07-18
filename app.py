@@ -31,8 +31,8 @@ except OSError:
 # BART
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model_name = 'facebook/bart-large-cnn'
-tokenizer = BartTokenizer.from_pretrained(model_name)
-model = BartForConditionalGeneration.from_pretrained(model_name).to(device)
+tokenizer = BartTokenizer.from_pretrained("facebook/bart-large-cnn", use_auth_token=st.secrets["HF_TOKEN"])
+model = BartForConditionalGeneration.from_pretrained("facebook/bart-large-cnn", use_auth_token=st.secrets["HF_TOKEN"])
 
 max_tokens = 1024
 chunk_max_len = 150
