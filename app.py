@@ -1,3 +1,6 @@
+import streamlit as st
+HF_TOKEN = st.secrets["HF_TOKEN"]
+
 import os
 import pandas as pd
 import nltk
@@ -41,9 +44,6 @@ except OSError:
 # BART summarization
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model_name = "facebook/bart-large-cnn"
-
-from streamlit.runtime.secrets import get as get_secret
-HF_TOKEN = get_secret("HF_TOKEN")
 
 tokenizer = BartTokenizer.from_pretrained(model_name, use_auth_token=HF_TOKEN)
 model = BartForConditionalGeneration.from_pretrained(model_name, use_auth_token=HF_TOKEN).to(device)
