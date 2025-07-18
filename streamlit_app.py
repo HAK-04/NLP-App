@@ -3,6 +3,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import io
 
+import spacy
+nlp = spacy.load("en_core_web_sm")
+
 from app import load_file, process_columns
 
 # streamlit config
@@ -38,7 +41,7 @@ if file_error and not df:
 st.markdown("#### Select Text Columns for NLP Processing")
 
 # detect columns
-text_columns = [col for col in df.columns if df[col].dtype == 'object' and df[col].nunique() > 5]
+text_columns = [col for col in df.select_dtypes(include='object').columns if is_textual_column(df[col])]
 
 if not text_columns:
     st.warning("No suitable text columns found in this file.")
@@ -119,3 +122,43 @@ if st.button("Run NLP Processing"):
             file_name="nlp_analysis_results.txt",
             mime="text/plain"
         )
+
+
+def is_textual_column(series, min_word_count=5, min_alpha_ratio=0.6, max_propn_ratio=0.5, sample_size=30):
+    """Determine if a column contains natural language text based on heuristics."""
+
+    samples = series.dropna().astype(str)
+    if samples.empty:
+        return False
+
+    samples = samples.sample(n=min(sample_size, len(samples)), random_state=42)
+
+    total_words = 0
+    total_alpha_ratios = []
+    proper_noun_ratios = []
+
+    for text in samples:
+        words = text.split()
+        total_words += len(words)
+
+        # alpha to alphanumeric ratio
+        alpha_chars = sum(c.isalpha() for c in text)
+        alphanum_chars = sum(c.isalnum() for c in text)
+        if alphanum_chars > 0:
+            total_alpha_ratios.append(alpha_chars / alphanum_chars)
+
+        # proper noun detection with spaCy
+        doc = nlp(text)
+        if len(doc) > 0:
+            propn_count = sum(1 for token in doc if token.pos_ == "PROPN")
+            proper_noun_ratios.append(propn_count / len(doc))
+
+    avg_word_count = total_words / len(samples)
+    avg_alpha_ratio = sum(total_alpha_ratios) / len(total_alpha_ratios) if total_alpha_ratios else 0
+    avg_propn_ratio = sum(proper_noun_ratios) / len(proper_noun_ratios) if proper_noun_ratios else 0
+
+    return (
+        avg_word_count >= min_word_count and
+        avg_alpha_ratio >= min_alpha_ratio and
+        avg_propn_ratio <= max_propn_ratio
+    )
