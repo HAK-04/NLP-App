@@ -2,9 +2,6 @@
 
 2. Save hf_token in C:\User\.streamlit\secrets.toml
 
-3. Run  python -m streamlit index.py
+3. Run  python -m streamlit streamlit_app.py
 
-
-Deploys locally hence processing speed based on hardware
-
-
+Note: Deploys locally hence processing speed based on hardware
