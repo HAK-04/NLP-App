@@ -4,13 +4,13 @@ import io
 
 from app import load_file, process_columns
 
-# Set Streamlit page config
+# streamlit config
 st.set_page_config(page_title="Topic Modeling & Summarization", layout="wide")
 
-st.title("🧠 NLP Column Analyzer")
+st.title("NLP Column Analyzer")
 st.markdown("Upload a text-rich dataset and select columns for **topic modeling and summarization**.")
 
-### 1. FILE UPLOAD ###
+# file upload
 st.markdown("#### Upload Dataset")
 uploaded_file = st.file_uploader(
     "Choose a file", 
@@ -33,10 +33,10 @@ if file_error and not df:
     st.markdown(f"<span style='color: red;'>{file_error}</span>", unsafe_allow_html=True)
     st.stop()
 
-### 2. TEXT COLUMN SELECTION ###
+# select columns
 st.markdown("#### Select Text Columns for NLP Processing")
 
-# Detect potential text columns (dtype == object and not too few unique values)
+# detect columns
 text_columns = [col for col in df.columns if df[col].dtype == 'object' and df[col].nunique() > 5]
 
 if not text_columns:
@@ -54,11 +54,11 @@ if not selected_columns:
     st.error("⚠️ Please select at least one text column.")
     st.stop()
 
-### 3. TOPIC COUNT SELECTION ###
+# topic slider
 st.markdown("#### Choose Number of Topics to Extract (per column)")
 num_topics = st.slider("Topics per column", min_value=1, max_value=5, value=3)
 
-# Inject topic count into processing function
+# topic count to processing function
 def custom_process_columns(df, selected_cols, topic_count):
     from app import generate_topic_modeling, summarize_column_with_equal_weight
     results = {}
@@ -77,8 +77,8 @@ def custom_process_columns(df, selected_cols, topic_count):
 
 st.markdown("----")
 
-### 4. RUN ANALYSIS ###
-if st.button("🚀 Run NLP Processing"):
+# run app.py
+if st.button("Run NLP Processing"):
     with st.spinner("Processing... This may take a few minutes."):
         output = custom_process_columns(df, selected_columns, num_topics)
 
@@ -97,7 +97,7 @@ if st.button("🚀 Run NLP Processing"):
                 if output[col]["wordcloud"]:
                     st.pyplot(output[col]["wordcloud"].figure)
     else:
-        # More than 10 columns: download-only
+        # display limit
         st.info("More than 10 columns selected. Results are provided as a downloadable file.")
         results_text = io.StringIO()
         for col in selected_columns:
