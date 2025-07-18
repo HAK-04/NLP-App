@@ -1,5 +1,5 @@
 import streamlit as st
-HF_TOKEN = st.secrets["HF_TOKEN"]
+HF_TOKEN = st.secrets["hf_token"]
 
 import os
 import pandas as pd
