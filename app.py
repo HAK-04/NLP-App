@@ -5,7 +5,8 @@ import spacy
 import torch
 import streamlit as st
 
-nltk.data.path.append(os.path.join(os.path.dirname(__file__), "nltk_data"))
+nltk.data.path = [os.path.join(os.path.dirname(__file__), "nltk_data")] + nltk.data.path #changed
+
 
 from nltk.corpus import stopwords
 from nltk.tokenize import sent_tokenize, word_tokenize
