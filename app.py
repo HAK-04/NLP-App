@@ -3,6 +3,7 @@ import pandas as pd
 import nltk
 import spacy
 import torch
+import streamlit as st
 
 nltk.data.path.append(os.path.join(os.path.dirname(__file__), "nltk_data"))
 
@@ -38,7 +39,6 @@ max_tokens = 1024
 chunk_max_len = 150
 entry_summary_max_len = 60
 
-# === Utility: File loader ===
 def load_file(file_obj):
     ext = os.path.splitext(file_obj.name)[-1].lower()
     if ext == '.csv':
