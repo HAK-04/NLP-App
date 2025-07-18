@@ -3,10 +3,6 @@ import pandas as pd
 import nltk
 import spacy
 import torch
-import streamlit as st
-
-nltk.data.path = [os.path.join(os.path.dirname(__file__), "nltk_data")] + nltk.data.path #changed
-
 
 from nltk.corpus import stopwords
 from nltk.tokenize import sent_tokenize, word_tokenize
@@ -18,11 +14,23 @@ from sklearn.decomposition import LatentDirichletAllocation
 
 from transformers import BartTokenizer, BartForConditionalGeneration
 
-# nltk.download('punkt')
-# nltk.download('stopwords')
+# nltk_data path
+nltk_data_path = os.path.join(os.path.dirname(__file__), "nltk_data")
+nltk.data.path = [nltk_data_path] + nltk.data.path
 
-stop_words = set(stopwords.words('english'))
+# nltk take 2
+try:
+    stop_words = set(stopwords.words('english'))
+except LookupError:
+    nltk.download('stopwords', download_dir=nltk_data_path)
+    stop_words = set(stopwords.words('english'))
 
+try:
+    _ = sent_tokenize("test")
+except LookupError:
+    nltk.download('punkt', download_dir=nltk_data_path)
+
+# spacy
 try:
     nlp = spacy.load("en_core_web_sm")
 except OSError:
@@ -30,12 +38,17 @@ except OSError:
     download("en_core_web_sm")
     nlp = spacy.load("en_core_web_sm")
 
-# BART
+# BART summarization
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model_name = 'facebook/bart-large-cnn'
-tokenizer = BartTokenizer.from_pretrained("facebook/bart-large-cnn", use_auth_token=st.secrets["HF_TOKEN"])
-model = BartForConditionalGeneration.from_pretrained("facebook/bart-large-cnn", use_auth_token=st.secrets["HF_TOKEN"])
+model_name = "facebook/bart-large-cnn"
 
+from streamlit.runtime.secrets import get as get_secret
+HF_TOKEN = get_secret("HF_TOKEN")
+
+tokenizer = BartTokenizer.from_pretrained(model_name, use_auth_token=HF_TOKEN)
+model = BartForConditionalGeneration.from_pretrained(model_name, use_auth_token=HF_TOKEN).to(device)
+
+# constants
 max_tokens = 1024
 chunk_max_len = 150
 entry_summary_max_len = 60
@@ -88,7 +101,6 @@ def generate_topic_modeling(texts, col_name, n_topics=5):
 
     return topics, wordcloud
 
-# Summarization
 def chunk_text(sentences, max_tokens=max_tokens):
     chunks = []
     current_chunk = []
