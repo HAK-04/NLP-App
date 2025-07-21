@@ -4,4 +4,4 @@
 
 3. Run  python -m streamlit streamlit_app.py
 
-Note: Deploys locally hence processing speed based on hardware
+Note: Deploys locally hence processing speed based on hardware. Added parallelization so now code works much faster given sufficient RAM.
