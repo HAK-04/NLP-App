@@ -74,6 +74,25 @@ def preprocess_text(text):
     all_tokens = lemmatized + bigram_list + trigram_list
     return ' '.join(all_tokens)
 
+def summary_preprocess(text, num_sentences=5):
+
+    if not isinstance(text, str) or not text.strip():
+        return ""
+
+    sentences = sent_tokenize(text)
+    if len(sentences) <= num_sentences:
+        return " ".join(sentences)
+
+    try:
+        vectorizer = TfidfVectorizer(stop_words='english', norm='l2')
+        tfidf_matrix = vectorizer.fit_transform(sentences)
+        sentence_scores = np.array(tfidf_matrix.sum(axis=1)).ravel()
+        top_sentence_indices = sentence_scores.argsort()[-num_sentences:][::-1]
+        top_sentence_indices.sort() # sort to maintain original sentence order
+        return " ".join([sentences[i] for i in top_sentence_indices])
+    except ValueError:
+        return " ".join(sentences[:num_sentences])
+    
 def generate_topic_modeling(texts, col_name, executor, n_topics=5):
 
     # parallelize preprocessing
@@ -84,6 +103,7 @@ def generate_topic_modeling(texts, col_name, executor, n_topics=5):
 
     vectorizer = TfidfVectorizer(max_df=0.9, min_df=2, stop_words='english', max_features=1000)
     tfidf_matrix = vectorizer.fit_transform(processed_docs)
+
     lda = LatentDirichletAllocation(n_components=n_topics, random_state=42)
     lda.fit(tfidf_matrix)
 
@@ -102,7 +122,6 @@ def generate_topic_modeling(texts, col_name, executor, n_topics=5):
     return topics, wordcloud
 
 def summarize_chunk(text, max_summary_length=chunk_max_len):
-    """Generates a summary for a single block of text (used only once at the end)."""
     inputs = tokenizer(
         text, return_tensors="pt", truncation=True, max_length=max_tokens
     ).to(device)
@@ -116,41 +135,43 @@ def summarize_chunk(text, max_summary_length=chunk_max_len):
     )
     return tokenizer.decode(summary_ids[0], skip_special_tokens=True)
 
-def extractive_summarize_entry(text, num_sentences=5):
-
-    if not isinstance(text, str) or not text.strip():
-        return ""
-
-    sentences = sent_tokenize(text)
-    if len(sentences) <= num_sentences:
-        return " ".join(sentences)
-
-    try:
-        vectorizer = TfidfVectorizer(stop_words='english', norm='l2')
-        tfidf_matrix = vectorizer.fit_transform(sentences)
-        sentence_scores = np.array(tfidf_matrix.sum(axis=1)).ravel()
-        top_sentence_indices = sentence_scores.argsort()[-num_sentences:][::-1]
-        top_sentence_indices.sort() # sort to maintain original sentence order
-        return " ".join([sentences[i] for i in top_sentence_indices])
-    except ValueError:
-        return " ".join(sentences[:num_sentences])
-
 def analyze_sentiment(text, analyzer):
-    """Applies VADER sentiment analysis to a given text."""
+
     if not isinstance(text, str) or not text.strip():
         return {'neg': 0.0, 'neu': 0.0, 'pos': 0.0, 'compound': 0.0}
     return analyzer.polarity_scores(text)
 
+def get_sentiment_label(compound_score):
+    if compound_score >= 0.05:
+        return "Positive"
+    elif compound_score <= -0.05:
+        return "Negative"
+    else:
+        return "Neutral"
+
+def summarize_sentiment_entries(entries, sentiment_scores, target_sentiment, summarization_func):
+    """Summarizes entries based on a target sentiment using a provided summarization function."""
+    filtered_entries = [
+        entries[i] for i in range(len(entries))
+        if get_sentiment_label(sentiment_scores[i]['compound']) == target_sentiment
+    ]
+    if not filtered_entries:
+        return f"No entries classified as {target_sentiment}."
+
+    combined_text = " ".join(filtered_entries) # combine entries
+    
+    if len(combined_text.split()) > 50: # check if enough content
+        return summarization_func(combined_text)
+    else:
+        return "Not enough content to generate a summary."
+    
 def process_columns(df, selected_cols, topic_count=5):
-    """
-    MODIFIED: Uses a ProcessPoolExecutor to parallelize the most intensive,
-    row-by-row text processing tasks. Includes sentiment analysis.
-    """
+
     results = {}
-    sid = SentimentIntensityAnalyzer() #VADER
+    sid = SentimentIntensityAnalyzer() # VADER
 
     max_workers = os.cpu_count() or 1
-    print(f"Using {max_workers} worker processes for parallelization.")
+    print(f"Using {max_workers} worker processes for parallelization.") # remove
 
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         for col in selected_cols:
@@ -158,36 +179,35 @@ def process_columns(df, selected_cols, topic_count=5):
 
             entries = df[col].dropna().astype(str).tolist()
 
+            normalized_entries = list(executor.map(summary_preprocess, entries))
 
-            normalized_entries = list(executor.map(extractive_summarize_entry, entries))
-
-            sentiment_scores = [analyze_sentiment(entry, sid) for entry in entries]
             # pass the executor to the topic modeling
             topics, wordcloud = generate_topic_modeling(normalized_entries, col, executor, n_topics=topic_count)
 
+            sentiment_scores = [analyze_sentiment(entry, sid) for entry in entries]
+
             combined_text = " ".join(normalized_entries)
-            final_summary = "Not enough unique content to generate a summary."
+            final_summary = "Not enough content to generate a summary."
 
             if len(combined_text.split()) > 50:
-                print(f"Starting BART summarization for column: {col}")
+                print(f"Starting summarization for column: {col}") # remove
                 final_summary = summarize_chunk(combined_text, max_summary_length=chunk_max_len)
 
             results[col] = {
+                "entries": entries, # keep original entries for sentiment summarization
+                "sentiment_scores": sentiment_scores,
                 "topics": topics,
                 "summary": final_summary,
                 "wordcloud": wordcloud,
-                "sentiment_scores": sentiment_scores
             }
 
     print("Processing complete!")
     return results
 
 def main():
-    """Main function to handle user input and run the analysis."""
 
     file_path = input("Enter the path to your CSV or Excel file: ")
 
-    # Load the file
     try:
         df = load_file(file_path)
         print("File loaded successfully.")
@@ -244,14 +264,7 @@ def main():
                     print(f"  Average Neutral: {avg_neu:.4f}")
                     print(f"  Average Positive: {avg_pos:.4f}")
                     print(f"  Average Compound: {avg_compound:.4f}")
-
-                    if avg_compound >= 0.05:
-                        overall_sentiment = "Positive"
-                    elif avg_compound <= -0.05:
-                        overall_sentiment = "Negative"
-                    else:
-                        overall_sentiment = "Neutral"
-                    print(f"  Overall Sentiment: {overall_sentiment}")
+                    print(f"  Overall Sentiment: {get_sentiment_label(avg_compound)}")
 
                     fig, axes = plt.subplots(1, 2, figsize=(18, 6))
                     fig.suptitle(f'Analysis for Column: {col}', fontsize=16)
@@ -271,6 +284,28 @@ def main():
 
                     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
                     plt.show()
+
+            # sentiment summary
+            for col, result in analysis_results.items():
+                if result['sentiment_scores']:
+                    sentiment_summary_choice = input(f"View summaries for specific sentiments in '{col}' (yes/no)? ").lower()
+                    if sentiment_summary_choice == 'yes':
+                        while True:
+                            sentiment_to_summarize = input("\nEnter sentiment to summarize (Negative, Neutral, Positive) or 'done' to finish: ").capitalize()
+                            if sentiment_to_summarize in ["Negative", "Neutral", "Positive"]:
+                                sentiment_summary = summarize_sentiment_entries(
+                                    result['entries'],
+                                    result['sentiment_scores'],
+                                    sentiment_to_summarize,
+                                    summarize_chunk # pass summarize_chunk here
+                                )
+                                print(f"\nSummary for {sentiment_to_summarize}:\n")
+                                print(sentiment_summary)
+                            elif sentiment_to_summarize == 'Done':
+                                break
+                            else:
+                                print("Invalid sentiment. Please enter Negative, Neutral, Positive, or 'done'.")
+
 
         else:
             print("No valid columns selected for processing.")
