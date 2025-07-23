@@ -63,7 +63,6 @@ try:
     logging.info(f"Successfully loaded BART model: {model_name}")
 except Exception as e:
     logging.error(f"Error loading BART model or tokenizer: {e}")
-    # Handle the error, maybe exit or inform the user
     raise
 
 max_tokens = 1024
@@ -87,7 +86,7 @@ def preprocess_text(text):
         token_words = word_tokenize(text.lower())
         token_words = [t for t in token_words if t.isalpha() and t not in stop_words]
         
-        if not token_words: # Handle case where text becomes empty after filtering
+        if not token_words: # text becomes empty after filtering
             return ""
 
         doc = nlp(' '.join(token_words)) # spaCy processing
@@ -101,7 +100,7 @@ def preprocess_text(text):
         return ' '.join(all_tokens)
     except Exception as e:
         logging.error(f"Error in preprocess_text for text (first 100 chars): '{text[:100]}' - {e}")
-        return "" # Return empty string or a placeholder on error
+        return ""
 
 def summary_preprocess(text, num_sentences=5):
     if not isinstance(text, str) or not text.strip():
@@ -132,7 +131,6 @@ def generate_topic_modeling(texts, col_name, executor, n_topics=5):
     
     processed_docs = list(executor.map(preprocess_text, valid_texts))
 
-    # Filter out any empty strings that might have resulted from errors in preprocess_text
     processed_docs = [doc for doc in processed_docs if doc.strip()]
 
     if not processed_docs:
@@ -147,7 +145,7 @@ def generate_topic_modeling(texts, col_name, executor, n_topics=5):
             logging.warning(f"TF-IDF matrix is empty or has no features for column: {col_name}. Cannot perform LDA.")
             return [], None
 
-        # Adjust n_components if it's greater than the number of samples or features
+        # insufficient topics
         effective_n_topics = min(n_topics, tfidf_matrix.shape[0], tfidf_matrix.shape[1] if tfidf_matrix.shape[1] > 0 else 1)
         if effective_n_topics < 1:
             logging.warning(f"Effective number of topics is less than 1 for column: {col_name}. Skipping LDA.")
@@ -159,7 +157,6 @@ def generate_topic_modeling(texts, col_name, executor, n_topics=5):
         feature_names = vectorizer.get_feature_names_out()
         topics = []
         for topic_idx, topic in enumerate(lda.components_):
-            # Ensure we don't try to access more features than available
             top_features_indices = topic.argsort()[-min(5, len(feature_names)):][::-1]
             top_features = [feature_names[i] for i in top_features_indices]
             topics.append((f"Topic {topic_idx + 1}", top_features))
@@ -197,11 +194,9 @@ def summarize_chunk(text, max_summary_length=chunk_max_len):
         return tokenizer.decode(summary_ids[0], skip_special_tokens=True)
     except RuntimeError as re: # Catch CUDA out of memory or similar
         logging.error(f"RuntimeError during summarization (possibly OOM): {re}. Text length: {len(text)}. Using CPU for this summary attempt.")
-        # Attempt to summarize on CPU as a fallback for this specific chunk
-        inputs = tokenizer(
-            text, return_tensors="pt", truncation=True, max_length=max_tokens
-        ).to("cpu") # Force CPU
-        model_cpu = model.to("cpu") # Move model to CPU temporarily
+        # Attempt to summarize on CPU
+        inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=max_tokens).to("cpu")
+        model_cpu = model.to("cpu")
         summary_ids = model_cpu.generate(
             inputs["input_ids"],
             num_beams=4,
@@ -210,7 +205,6 @@ def summarize_chunk(text, max_summary_length=chunk_max_len):
             no_repeat_ngram_size=3,
             early_stopping=True
         )
-        # Move model back to original device after use if it was moved to CPU
         model.to(device)
         return tokenizer.decode(summary_ids[0], skip_special_tokens=True)
     except Exception as e:
@@ -253,11 +247,7 @@ def process_columns(df, selected_cols, topic_count=5):
     results = {}
     sid = SentimentIntensityAnalyzer() # VADER
 
-    # --- FIX: Explicitly control max_workers for ProcessPoolExecutor ---
-    # Using a slightly lower number than cpu_count() can sometimes prevent resource exhaustion
-    # and potential process crashes, especially with memory-intensive NLP tasks.
-    # On a Xeon Gold 6148 (20 cores, 40 threads), 16 or 24 is a good starting point.
-    # 24 is a good balance between parallelism and not overwhelming the system.
+    # Explicitly control max_workers
     max_workers = min(os.cpu_count() or 1, 24)
     logging.info(f"Using {max_workers} worker processes for parallelization.")
 
@@ -267,12 +257,8 @@ def process_columns(df, selected_cols, topic_count=5):
 
             entries = df[col].dropna().astype(str).tolist()
 
-            # --- FIX: Error handling inside worker functions (already done above) ---
-            # The try-except blocks in preprocess_text and summary_preprocess
-            # are crucial here to prevent worker crashes from malformed data.
             logging.info(f"Starting summary_preprocess for column {col} with {len(entries)} entries...")
             normalized_entries = list(executor.map(summary_preprocess, entries))
-            # Clean up processed_docs by removing any empty strings resulting from errors
             normalized_entries = [ne for ne in normalized_entries if ne.strip()]
             logging.info(f"Finished summary_preprocess for column {col}.")
 
