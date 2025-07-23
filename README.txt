@@ -1,6 +1,6 @@
 1. Download requirements
 
-2. Save hf_token in ~~C:\User\.streamlit\secrets.toml~~ .env
+2. Save hf_token in C:\User\.streamlit\secrets.toml .env
 
 3. Run  python -m streamlit streamlit_app.py
 
