@@ -18,13 +18,13 @@ try:
 except RuntimeError:
     pass
 
-# st config
+# page config
 st.set_page_config(page_title="Topic Modeling & Summarization", layout="wide")
 
 st.title("NLP Column Analyzer")
-st.markdown("Upload a text-rich dataset and select columns for **topic modeling, summarization, and sentiment analysis**.")
+st.markdown("Upload a dataset and select columns for **topic modeling, summarization, and sentiment analysis**.")
 
-# File Upload
+# file Upload
 st.markdown("#### Upload Dataset")
 uploaded_file = st.file_uploader(
     "Choose a file",
@@ -81,7 +81,7 @@ if st.session_state.df is not None:
 
 if st.session_state.df is not None:
     if not available_text_like_columns:
-        st.warning("No object-type columns found in this file that could contain text data.")
+        st.warning("No columns found in this file that could contain text data.")
         st.session_state.selected_columns = []
     else:
         current_selection_is_all = set(st.session_state.selected_columns) == set(available_text_like_columns) and len(available_text_like_columns) > 0
@@ -135,19 +135,19 @@ if st.button("Run NLP"):
         st.session_state.processing_complete = False
         st.stop()
 
-    with st.spinner("Processing NLP and preparing results... This may take a few minutes."):
+    with st.spinner("Processing NLP and preparing results..."):
         output = process_columns(st.session_state.df, viable_selected_columns, topic_count=st.session_state.num_topics)
 
         st.session_state.output = output
         st.session_state.processing_complete = True
         st.session_state.selected_columns_for_display = viable_selected_columns
 
-        # results preparation and display in spinner's context 
+        # results prep
         output = st.session_state.output
         selected_columns = st.session_state.selected_columns_for_display
 
         if not selected_columns: # If no columns were successfully processed
-            st.info("No viable columns were processed for NLP. Please check your column selections and file content.")
+            st.info("No viable columns were processed for NLP.")
         else:
             results_text_buffer = io.StringIO()
             image_buffers = {}
@@ -235,7 +235,7 @@ if st.button("Run NLP"):
 
             zip_buffer.seek(0)
 
-            st.success("✅ Processing complete! See results below.") # Move success message here
+            st.success("✅ Processing complete! See results below.")
 
             st.download_button(
                 label="📥 Download All Results (ZIP)",
@@ -317,4 +317,4 @@ if st.button("Run NLP"):
                         else:
                             st.info("No sentiment data available for summarization.")
             else:
-                st.info("Interactive display is limited to 10 columns. All results are available for download.")
+                st.info("Interactive display limit is 10 columns. Download results to view all")
