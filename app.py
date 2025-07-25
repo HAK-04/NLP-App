@@ -52,7 +52,7 @@ except OSError:
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logging.info(f"Using device: {device} for BART model.")
 
-model_name = "ssleifer/distilbart-cnn-12-6"
+model_name = "sshleifer/distilbart-cnn-12-6"
 
 # Fetch HF_TOKEN from Streamlit secrets
 HF_TOKEN = st.secrets["HF_TOKEN"] if "HF_TOKEN" in st.secrets else None
