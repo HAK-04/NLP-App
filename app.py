@@ -6,7 +6,7 @@ import spacy
 import torch
 import matplotlib.pyplot as plt
 import gc
-import logging
+import logging      # termnal error logs
 
 from nltk.corpus import stopwords
 from nltk.tokenize import sent_tokenize, word_tokenize
@@ -21,7 +21,6 @@ from transformers import BartTokenizer, BartForConditionalGeneration
 
 from concurrent.futures import ProcessPoolExecutor
 
-# --- Logging Configuration ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 try:
@@ -50,17 +49,17 @@ except OSError:
     nlp = spacy.load("en_core_web_sm")
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-logging.info(f"Using device: {device} for BART model.")
+#logging.info(f"Using device: {device} for BART model.")    too much spam removed
 
 model_name = "facebook/bart-large-cnn" # ssleifer/distilbart-cnn-12-6 for moar speed.
 
-HF_TOKEN = os.environ.get("HF_TOKEN", None) #IMPORTANT
+HF_TOKEN = os.environ.get("HF_TOKEN", None)
 
 # Load tokenizer and model once globally
 try:
     tokenizer = BartTokenizer.from_pretrained(model_name, use_auth_token=HF_TOKEN)
     model = BartForConditionalGeneration.from_pretrained(model_name, use_auth_token=HF_TOKEN).to(device)
-    logging.info(f"Successfully loaded BART model: {model_name}")
+    logging.info(f"Successfully load BART model: {model_name}")
 except Exception as e:
     logging.error(f"Error loading BART model or tokenizer: {e}")
     raise
@@ -99,7 +98,7 @@ def preprocess_text(text):
         all_tokens = lemmatized + bigram_list + trigram_list
         return ' '.join(all_tokens)
     except Exception as e:
-        logging.error(f"Error in preprocess_text for text (first 100 chars): '{text[:100]}' - {e}")
+        logging.error(f"Error in preprocess_text for: '{text[:100]}' - {e}")
         return ""
 
 def summary_preprocess(text, num_sentences=5):
@@ -118,10 +117,10 @@ def summary_preprocess(text, num_sentences=5):
         top_sentence_indices.sort() # sort to maintain original sentence order
         return " ".join([sentences[i] for i in top_sentence_indices])
     except ValueError as ve:
-        logging.warning(f"ValueError in summary_preprocess (likely insufficient data): {ve}. Returning first {num_sentences} sentences.")
+        logging.warning(f"ValueError in summary_preprocess: {ve}. Returning first {num_sentences} sentences.")  # insufficient data
         return " ".join(sentences[:num_sentences])
     except Exception as e:
-        logging.error(f"Error in summary_preprocess for text (first 100 chars): '{text[:100]}' - {e}")
+        logging.error(f"Error in summary_preprocess: '{text[:100]}' - {e}")
         return " ".join(sentences[:num_sentences]) # Fallback
 
 
@@ -134,7 +133,7 @@ def generate_topic_modeling(texts, col_name, executor, n_topics=5):
     processed_docs = [doc for doc in processed_docs if doc.strip()]
 
     if not processed_docs:
-        logging.info(f"No valid processed documents for topic modeling in column: {col_name}")
+        logging.info(f"No valid processed documents: {col_name}")
         return [], None
 
     try:
@@ -142,13 +141,13 @@ def generate_topic_modeling(texts, col_name, executor, n_topics=5):
         tfidf_matrix = vectorizer.fit_transform(processed_docs)
 
         if tfidf_matrix.shape[0] == 0 or tfidf_matrix.shape[1] == 0:
-            logging.warning(f"TF-IDF matrix is empty or has no features for column: {col_name}. Cannot perform LDA.")
+            logging.warning(f"TF-IDF matrix is empty for: {col_name}")
             return [], None
 
         # insufficient topics
         effective_n_topics = min(n_topics, tfidf_matrix.shape[0], tfidf_matrix.shape[1] if tfidf_matrix.shape[1] > 0 else 1)
         if effective_n_topics < 1:
-            logging.warning(f"Effective number of topics is less than 1 for column: {col_name}. Skipping LDA.")
+            logging.warning(f"Number of topics is less than 1 for column: {col_name}")
             return [], None
 
         lda = LatentDirichletAllocation(n_components=effective_n_topics, random_state=42)
@@ -172,13 +171,13 @@ def generate_topic_modeling(texts, col_name, executor, n_topics=5):
 
         return topics, wordcloud
     except Exception as e:
-        logging.error(f"Error generating topic modeling for column {col_name}: {e}")
+        logging.error(f"Error generating topic modeling for {col_name}: {e}")
         return [], None
 
 
 def summarize_chunk(text, max_summary_length=chunk_max_len):
     if not isinstance(text, str) or not text.strip():
-        return "Not enough content to generate a summary."
+        return "Not enough content to generate summary."
     try:
         inputs = tokenizer(
             text, return_tensors="pt", truncation=True, max_length=max_tokens
@@ -193,7 +192,7 @@ def summarize_chunk(text, max_summary_length=chunk_max_len):
         )
         return tokenizer.decode(summary_ids[0], skip_special_tokens=True)
     except RuntimeError as re: # Catch CUDA out of memory or similar
-        logging.error(f"RuntimeError during summarization (possibly OOM): {re}. Text length: {len(text)}. Using CPU for this summary attempt.")
+        logging.error(f"RuntimeError during summarization: {re}. Text length: {len(text)}")
         # Attempt to summarize on CPU
         inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=max_tokens).to("cpu")
         model_cpu = model.to("cpu")
@@ -208,7 +207,7 @@ def summarize_chunk(text, max_summary_length=chunk_max_len):
         model.to(device)
         return tokenizer.decode(summary_ids[0], skip_special_tokens=True)
     except Exception as e:
-        logging.error(f"Error during summarization for text (first 100 chars): '{text[:100]}' - {e}")
+        logging.error(f"Error during summarization for: '{text[:100]}' - {e}")
         return "Error generating summary."
 
 def analyze_sentiment(text, analyzer):
@@ -217,7 +216,7 @@ def analyze_sentiment(text, analyzer):
     try:
         return analyzer.polarity_scores(text)
     except Exception as e:
-        logging.error(f"Error analyzing sentiment for text (first 100 chars): '{text[:100]}' - {e}")
+        logging.error(f"Error analyzing sentiment for: '{text[:100]}' - {e}")
         return {'neg': 0.0, 'neu': 0.0, 'pos': 0.0, 'compound': 0.0}
 
 def get_sentiment_label(compound_score):
@@ -229,7 +228,6 @@ def get_sentiment_label(compound_score):
         return "Neutral"
 
 def summarize_sentiment_entries(entries, sentiment_scores, target_sentiment, summarization_func):
-    """Summarizes entries based on a target sentiment using a provided summarization function."""
     filtered_entries = [
         entries[i] for i in range(len(entries))
         if get_sentiment_label(sentiment_scores[i]['compound']) == target_sentiment
@@ -249,7 +247,7 @@ def process_columns(df, selected_cols, topic_count=5):
 
     # Explicitly control max_workers
     max_workers = min(os.cpu_count() or 1, 24)
-    logging.info(f"Using {max_workers} worker processes for parallelization.")
+    logging.info(f"Using {max_workers} worker processes")
 
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         for col in selected_cols:
@@ -257,27 +255,27 @@ def process_columns(df, selected_cols, topic_count=5):
 
             entries = df[col].dropna().astype(str).tolist()
 
-            logging.info(f"Starting summary_preprocess for column {col} with {len(entries)} entries...")
+            #logging.info(f"Starting summary_preprocess for column {col} with {len(entries)} entries...")
             normalized_entries = list(executor.map(summary_preprocess, entries))
             normalized_entries = [ne for ne in normalized_entries if ne.strip()]
-            logging.info(f"Finished summary_preprocess for column {col}.")
+            #logging.info(f"Finished summary_preprocess for column {col}.")
 
             # pass the executor to the topic modeling
-            logging.info(f"Starting topic modeling for column {col}...")
+            #logging.info(f"Starting topic modeling for column {col}...")
             topics, wordcloud = generate_topic_modeling(normalized_entries, col, executor, n_topics=topic_count)
-            logging.info(f"Finished topic modeling for column {col}.")
+            #logging.info(f"Finished topic modeling for column {col}.")
 
-            logging.info(f"Starting sentiment analysis for column {col}...")
+            #logging.info(f"Starting sentiment analysis for column {col}...")
             sentiment_scores = [analyze_sentiment(entry, sid) for entry in entries]
-            logging.info(f"Finished sentiment analysis for column {col}.")
+            #logging.info(f"Finished sentiment analysis for column {col}.")
 
             combined_text = " ".join(normalized_entries)
             final_summary = "Not enough content to generate a summary."
 
             if len(combined_text.split()) > 50:
-                logging.info(f"Starting summarization for column: {col}")
+                #logging.info(f"Starting summarization for column: {col}")
                 final_summary = summarize_chunk(combined_text, max_summary_length=chunk_max_len)
-                logging.info(f"Finished summarization for column: {col}")
+                #logging.info(f"Finished summarization for column: {col}")
             else:
                 logging.info(f"Skipping summarization for column {col}: Not enough content.")
 
@@ -290,5 +288,5 @@ def process_columns(df, selected_cols, topic_count=5):
             }
             gc.collect()
 
-    logging.info("Processing complete!")
+    logging.info("NLP complete")
     return results
