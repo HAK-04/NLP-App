@@ -7,6 +7,7 @@ import torch
 import matplotlib.pyplot as plt
 import gc
 import logging      # termnal error logs
+import streamlit as st # Import streamlit
 
 from nltk.corpus import stopwords
 from nltk.tokenize import sent_tokenize, word_tokenize
@@ -49,11 +50,12 @@ except OSError:
     nlp = spacy.load("en_core_web_sm")
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#logging.info(f"Using device: {device} for BART model.")    too much spam removed
+logging.info(f"Using device: {device} for BART model.")
 
 model_name = "facebook/bart-large-cnn" # ssleifer/distilbart-cnn-12-6 for moar speed.
 
-HF_TOKEN = os.environ.get("HF_TOKEN", None)
+# Fetch HF_TOKEN from Streamlit secrets
+HF_TOKEN = st.secrets["HF_TOKEN"] if "HF_TOKEN" in st.secrets else None
 
 # Load tokenizer and model once globally
 try:
@@ -263,11 +265,11 @@ def process_columns(df, selected_cols, topic_count=5):
             # pass the executor to the topic modeling
             #logging.info(f"Starting topic modeling for column {col}...")
             topics, wordcloud = generate_topic_modeling(normalized_entries, col, executor, n_topics=topic_count)
-            #logging.info(f"Finished topic modeling for column {col}.")
+            logging.info(f"Finished topic modeling for column {col}.")
 
             #logging.info(f"Starting sentiment analysis for column {col}...")
             sentiment_scores = [analyze_sentiment(entry, sid) for entry in entries]
-            #logging.info(f"Finished sentiment analysis for column {col}.")
+            logging.info(f"Finished sentiment analysis for column {col}.")
 
             combined_text = " ".join(normalized_entries)
             final_summary = "Not enough content to generate a summary."
@@ -275,7 +277,7 @@ def process_columns(df, selected_cols, topic_count=5):
             if len(combined_text.split()) > 50:
                 #logging.info(f"Starting summarization for column: {col}")
                 final_summary = summarize_chunk(combined_text, max_summary_length=chunk_max_len)
-                #logging.info(f"Finished summarization for column: {col}")
+                logging.info(f"Finished summarization for column: {col}")
             else:
                 logging.info(f"Skipping summarization for column {col}: Not enough content.")
 
