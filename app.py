@@ -21,7 +21,6 @@ from transformers import BartTokenizer, BartForConditionalGeneration
 
 from concurrent.futures import ProcessPoolExecutor
 
-# --- Logging Configuration ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 try:
@@ -52,11 +51,10 @@ except OSError:
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logging.info(f"Using device: {device} for BART model.")
 
-model_name = "sshleifer/distilbart-cnn-12-6" # facebook/bart-large-cnn or sshleifer/distilbart-cnn-12-63 alt
+model_name = "sshleifer/distilbart-cnn-12-6" # facebook/bart-large-cnn  alt
 
-HF_TOKEN = os.environ.get("HF_TOKEN", None) #IMPORTANT
+HF_TOKEN = os.environ.get("HF_TOKEN", None)
 
-# Load tokenizer and model once globally
 try:
     tokenizer = BartTokenizer.from_pretrained(model_name, use_auth_token=HF_TOKEN)
     model = BartForConditionalGeneration.from_pretrained(model_name, use_auth_token=HF_TOKEN).to(device)
@@ -89,10 +87,9 @@ def preprocess_text(text):
         if not token_words: # text becomes empty after filtering
             return ""
 
-        doc = nlp(' '.join(token_words)) # spaCy processing
+        doc = nlp(' '.join(token_words))
         lemmatized = [token.lemma_ for token in doc]
         
-        # Ensure there are enough tokens for bigrams/trigrams
         bigram_list = ['_'.join(b) for b in bigrams(lemmatized)] if len(lemmatized) >= 2 else []
         trigram_list = ['_'.join(t) for t in trigrams(lemmatized)] if len(lemmatized) >= 3 else []
         
@@ -229,7 +226,6 @@ def get_sentiment_label(compound_score):
         return "Neutral"
 
 def summarize_sentiment_entries(entries, sentiment_scores, target_sentiment, summarization_func):
-    """Summarizes entries based on a target sentiment using a provided summarization function."""
     filtered_entries = [
         entries[i] for i in range(len(entries))
         if get_sentiment_label(sentiment_scores[i]['compound']) == target_sentiment
