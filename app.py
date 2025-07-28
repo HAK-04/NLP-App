@@ -52,7 +52,7 @@ except OSError:
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logging.info(f"Using device: {device} for BART model.")
 
-model_name = "facebook/bart-large-cnn" # ssleifer/distilbart-cnn-12-6 for moar speed.
+model_name = "sshleifer/distilbart-cnn-12-6" # facebook/bart-large-cnn alt
 
 HF_TOKEN = os.environ.get("HF_TOKEN", None) #IMPORTANT
 
