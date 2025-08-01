@@ -21,8 +21,8 @@ except RuntimeError:
 # page config
 st.set_page_config(page_title="Topic Modeling & Summarization", layout="wide")
 
-st.title("NLP Column Analyzer")
-st.markdown("Upload a dataset and select columns for **topic modeling, summarization, and sentiment analysis**.")
+st.title("NLP Textual Data Analyzer")
+st.markdown("Upload a dataset and select columns for **Topic Modeling, Summarization, and Sentiment Analysis**.")
 
 # file Upload
 st.markdown("#### Upload Dataset")
